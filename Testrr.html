@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survivor.io 遊戲原型</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            overflow: hidden;
+            background-color: #1a202c;
+            color: #e2e8f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            max-width: 1000px;
+            max-height: 800px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            background-color: #2d3748;
+            display: block;
+            border-radius: 0.5rem;
+        }
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 1rem;
+            gap: 1rem;
+        }
+        #top-bar {
+            display: grid;
+            grid-template-columns: repeat(11, 1fr);
+            gap: 0.5rem;
+            text-align: center;
+        }
+        #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: none; 
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            pointer-events: auto;
+            padding: 1rem;
+        }
+        .controls-panel {
+            position: absolute;
+            bottom: 1rem;
+            background-color: rgba(26, 32, 44, 0.8);
+            backdrop-filter: blur(5px);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            width: 280px;
+            max-height: calc(100vh - 8rem);
+            overflow-y: auto;
+            transform: scale(0.8);
+        }
+        #enemy-controls {
+            right: 1rem;
+            transform-origin: bottom right;
+        }
+        #player-controls {
+            left: 1rem;
+            transform-origin: bottom left;
+        }
+        .controls-panel .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .controls-panel .minimize-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            font-weight: bold;
+            line-height: 24px;
+            text-align: center;
+            cursor: pointer;
+        }
+        .controls-panel .panel-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .controls-panel.collapsed .panel-content {
+            display: none;
+        }
+        .controls-panel label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.875rem;
+            min-height: 2.25rem;
+        }
+        .controls-panel input[type="range"] {
+            width: 120px;
+        }
+        .controls-panel input[type="checkbox"] {
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+        .divider {
+            height: 1px;
+            background-color: rgba(255,255,255,0.2);
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui-container">
+        <div id="top-bar">
+            <div><h2 class="text-xs font-bold">解析度</h2><p id="resolution-display" class="text-lg font-bold">0x0</p></div>
+            <div><h2 class="text-xs font-bold">分數</h2><p id="score" class="text-lg font-bold">0</p></div>
+            <div><h2 class="text-xs font-bold">時間</h2><p id="timer" class="text-lg font-bold">0/300</p></div>
+            <div><h2 class="text-xs font-bold">苦無傷</h2><p id="damage-dealt-1" class="text-lg font-bold">0</p></div>
+            <div><h2 class="text-xs font-bold">力場傷</h2><p id="damage-dealt-2" class="text-lg font-bold">0</p></div>
+            <div><h2 class="text-xs font-bold">守衛傷</h2><p id="damage-dealt-3" class="text-lg font-bold">0</p></div>
+            <div><h2 class="text-xs font-bold">火箭傷</h2><p id="damage-dealt-4" class="text-lg font-bold">0</p></div>
+            <div><h2 class="text-xs font-bold">雷電傷</h2><p id="damage-dealt-5" class="text-lg font-bold">0</p></div>
+            <div><h2 class="text-xs font-bold">榴槤傷</h2><p id="damage-dealt-6" class="text-lg font-bold">0</p></div>
+            <div><h2 class="text-xs font-bold">受傷</h2><p id="damage-taken" class="text-lg font-bold">0</p></div>
+            <div><h2 class="text-xs font-bold">怪物</h2><p id="enemy-count" class="text-lg font-bold">0/50</p></div>
+        </div>
+    </div>
+    <div id="game-over-screen">
+        <h1 class="text-4xl font-bold mb-4 text-green-400">時間到！</h1>
+        
+        <!-- Collapsible Stats Container -->
+        <div id="stats-details-wrapper" class="hidden w-full max-w-4xl mb-4">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="text-center p-2 flex-1">
+                    <p class="text-2xl mb-2">最終分數: <span id="final-score">0</span></p>
+                    <p class="text-lg mb-1">苦無總傷害: <span id="final-damage-dealt-1">0</span> (<span id="final-overkill-damage-1" class="text-yellow-400">0</span>)</p>
+                    <p class="text-lg mb-1">力場總傷害: <span id="final-damage-dealt-2">0</span> (<span id="final-overkill-damage-2" class="text-yellow-400">0</span>)</p>
+                    <p class="text-lg mb-1">守衛總傷害: <span id="final-damage-dealt-3">0</span> (<span id="final-overkill-damage-3" class="text-yellow-400">0</span>)</p>
+                    <p class="text-lg mb-1">火箭總傷害: <span id="final-damage-dealt-4">0</span> (<span id="final-overkill-damage-4" class="text-yellow-400">0</span>)</p>
+                    <p class="text-lg mb-1">雷電總傷害: <span id="final-damage-dealt-5">0</span> (<span id="final-overkill-damage-5" class="text-yellow-400">0</span>)</p>
+                    <p class="text-lg mb-1">榴槤總傷害: <span id="final-damage-dealt-6">0</span> (<span id="final-overkill-damage-6" class="text-yellow-400">0</span>)</p>
+                    <p class="text-lg mb-4">承受總傷害: <span id="final-damage-taken">0</span></p>
+                </div>
+                <div id="efficiency-stats" class="text-left p-2 flex-1 text-base">
+                    <h2 class="text-xl font-bold mb-2 text-center">技能效益分析</h2>
+                    <!-- Content will be generated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-4 mb-2">
+            <button id="restart-button" class="px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition-colors text-xl">重新開始</button>
+            <button id="copy-log-button" class="px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-colors text-xl">複製表格</button>
+            <button id="toggle-stats-button" class="px-6 py-3 bg-gray-600 text-white font-bold rounded-lg hover:bg-gray-700 transition-colors text-xl">顯示詳細資訊</button>
+        </div>
+        
+        <div id="damage-log-container" class="w-full max-w-4xl max-h-32 overflow-y-auto bg-gray-800 rounded-lg p-2 border border-gray-600">
+            <table id="damage-log-table" class="w-full text-sm text-left text-gray-300">
+                <!-- Content will be generated by JS -->
+            </table>
+        </div>
+    </div>
+    
+    <div id="enemy-controls" class="controls-panel">
+        <div class="panel-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <h3 class="text-lg font-bold">怪物參數</h3>
+            <button class="minimize-btn">_</button>
+        </div>
+        <div class="panel-content">
+            <label>基礎血量: <input type="range" id="enemyHealth" min="100" max="10000" value="200"><span id="enemyHealthValue">100</span></label>
+            <label>碰撞傷害: <input type="range" id="enemyDamage" min="10" max="50" value="10"><span id="enemyDamageValue">10</span></label>
+            <label>生成數量: <input type="range" id="spawnCount" min="1" max="100" value="10"><span id="spawnCountValue">1</span></label>
+            <label>生成間隔(ms): <input type="range" id="spawnRate" min="200" max="10000" value="5000"><span id="spawnRateValue">2000</span></label>
+            <label>加速間隔(秒): <input type="range" id="spawnReductionInterval" min="1" max="10" value="10"><span id="spawnReductionIntervalValue">5</span></label>
+            <label>加速量(ms): <input type="range" id="spawnRateReduction" min="0" max="500" value="0"><span id="spawnRateReductionValue">100</span></label>
+            <label>加速數量: <input type="range" id="spawnAccelerationCount" min="0" max="50" value="2"><span id="spawnAccelerationCountValue">0</span></label>
+            <label>血量成長倍率: <input type="range" id="growthRate" min="1.00" max="2.00" step="0.01" value="1.35"><span id="growthRateValue">1.01</span></label>
+            <label>移動速度: <input type="range" id="moveSpeed" min="0.5" max="5" step="0.1" value="1"><span id="moveSpeedValue">1</span></label>
+            <label>最大怪物數: <input type="range" id="maxEnemies" min="10" max="500" value="300"><span id="maxEnemiesValue">100</span></label>
+        </div>
+    </div>
+
+    <div id="player-controls" class="controls-panel">
+        <div class="panel-header" onclick="this.parentElement.classList.toggle('collapsed')">
+            <h3 class="text-lg font-bold">玩家技能</h3>
+            <button class="minimize-btn">_</button>
+        </div>
+        <div class="panel-content">
+            <label class="font-bold text-lg">全體等級: <input type="range" id="masterLevel" min="1" max="4" value="1"><span id="masterLevelValue">1</span></label>
+            <label>自動升級: <input type="checkbox" id="autoUpgradeEnabled" checked></label>
+            <div class="divider"></div>
+            <h4 class="text-md font-bold text-gray-300">苦無 (白)</h4>
+            <label>啟用: <input type="checkbox" id="skill1Enabled" checked></label>
+            <label>等級: <input type="range" id="level1" min="1" max="4" value="1"><span id="level1Value">1</span></label>
+            <label>攻擊間隔(ms): <span id="cooldown1Display">5</span></label>
+            <label>子彈數量: <span id="count1Display">1</span></label>
+            <label>子彈速度: <span id="speed1Display">7</span></label>
+            <label>子彈半徑: <span id="radius1Display">5</span></label>
+            <label>技能傷害: <span id="damage1Display">10</span></label>
+            <div class="divider"></div>
+            <h4 class="text-md font-bold text-gray-300">力場 (紅)</h4>
+            <label>啟用: <input type="checkbox" id="skill2Enabled" checked></label>
+            <label>等級: <input type="range" id="level2" min="1" max="4" value="1"><span id="level2Value">1</span></label>
+            <label>攻擊間隔(ms): <span id="cooldown2Display">5</span></label>
+            <label>範圍半徑: <span id="radius2Display">100</span></label>
+            <label>技能傷害: <span id="damage2Display">10</span></label>
+            <div class="divider"></div>
+            <h4 class="text-md font-bold text-gray-300">守衛 (藍)</h4>
+            <label>啟用: <input type="checkbox" id="skill3Enabled" checked></label>
+            <label>等級: <input type="range" id="level3" min="1" max="4" value="1"><span id="level3Value">1</span></label>
+            <label>攻擊間隔(ms): <span id="cooldown3Display">10</span></label>
+            <label>球體數量: <span id="count3Display">1</span></label>
+            <label>持續時間(ms): <span id="duration3Display">30</span></label>
+            <label>環繞速度: <span id="orbitSpeed3Display">2</span></label>
+            <label>環繞半徑: <span id="orbitRadius3Display">50</span></label>
+            <label>球體半徑: <span id="radius3Display">10</span></label>
+            <label>技能傷害: <span id="damage3Display">5</span></label>
+            <div class="divider"></div>
+            <h4 class="text-md font-bold text-gray-300">火箭 (綠)</h4>
+            <label>啟用: <input type="checkbox" id="skill4Enabled" checked></label>
+            <label>等級: <input type="range" id="level4" min="1" max="4" value="1"><span id="level4Value">1</span></label>
+            <label>攻擊間隔(ms): <span id="cooldown4Display">8</span></label>
+            <label>子彈速度: <span id="speed4Display">6</span></label>
+            <label>子彈半徑: <span id="radius4Display">6</span></label>
+            <label>子彈傷害: <span id="damage4Display">8</span></label>
+            <label>爆炸半徑: <span id="explosionRadius4Display">40</span></label>
+            <label>爆炸傷害: <span id="explosionDamage4Display">12</span></label>
+            <div class="divider"></div>
+            <h4 class="text-md font-bold text-gray-300">雷電 (黃)</h4>
+            <label>啟用: <input type="checkbox" id="skill5Enabled" checked></label>
+            <label>等級: <input type="range" id="level5" min="1" max="4" value="1"><span id="level5Value">1</span></label>
+            <label>攻擊間隔(ms): <span id="cooldown5Display">12</span></label>
+            <label>技能數量: <span id="count5Display">1</span></label>
+            <label>持續時間(ms): <span id="duration5Display">20</span></label>
+            <label>技能半徑: <span id="radius5Display">50</span></label>
+            <label>初始傷害: <span id="initialDamage5Display">20</span></label>
+            <label>持續傷害: <span id="dotDamage5Display">10</span></label>
+            <label>傷害間隔(ms): <span id="dotInterval5Display">5</span></label>
+            <div class="divider"></div>
+            <h4 class="text-md font-bold text-gray-300">榴槤 (紫)</h4>
+            <label>啟用: <input type="checkbox" id="skill6Enabled" checked></label>
+            <label>等級: <input type="range" id="level6" min="1" max="4" value="1"><span id="level6Value">1</span></label>
+            <label>攻擊間隔(ms): <span id="cooldown6Display">20</span></label>
+            <label>持續時間(ms): <span id="duration6Display">50</span></label>
+            <label>球體數量: <span id="count6Display">1</span></label>
+            <label>球體半徑: <span id="radius6Display">12</span></label>
+            <label>飛行速度: <span id="speed6Display">150</span></label>
+            <label>技能傷害: <span id="damage6Display">15</span></label>
+            <div class="divider"></div>
+            <h5 class="text-sm font-bold text-gray-400">榴槤 - 小球</h5>
+            <label>發射間隔(ms): <span id="subFireInterval6Display">3</span></label>
+            <label>小球傷害: <span id="subDamage6Display">5</span></label>
+            <label>小球速度: <span id="subSpeed6Display">100</span></label>
+            <label>小球時間(ms): <span id="subDuration6Display">10</span></label>
+            <label>小球半徑: <span id="subRadius6Display">4</span></label>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- 全域變數與常數 ---
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const restartButton = document.getElementById('restart-button');
+    const copyLogButton = document.getElementById('copy-log-button');
+    const toggleStatsButton = document.getElementById('toggle-stats-button');
+    const scoreEl = document.getElementById('score');
+    const timerEl = document.getElementById('timer');
+    const damageDealt1El = document.getElementById('damage-dealt-1');
+    const damageDealt2El = document.getElementById('damage-dealt-2');
+    const damageDealt3El = document.getElementById('damage-dealt-3');
+    const damageDealt4El = document.getElementById('damage-dealt-4');
+    const damageDealt5El = document.getElementById('damage-dealt-5');
+    const damageDealt6El = document.getElementById('damage-dealt-6');
+    const damageTakenEl = document.getElementById('damage-taken');
+    const enemyCountEl = document.getElementById('enemy-count');
+    const resolutionDisplayEl = document.getElementById('resolution-display');
+    const finalScoreEl = document.getElementById('final-score');
+    const finalDamageDealt1El = document.getElementById('final-damage-dealt-1');
+    const finalDamageDealt2El = document.getElementById('final-damage-dealt-2');
+    const finalDamageDealt3El = document.getElementById('final-damage-dealt-3');
+    const finalDamageDealt4El = document.getElementById('final-damage-dealt-4');
+    const finalDamageDealt5El = document.getElementById('final-damage-dealt-5');
+    const finalDamageDealt6El = document.getElementById('final-damage-dealt-6');
+    const finalDamageTakenEl = document.getElementById('final-damage-taken');
+    const finalOverkillDamage1El = document.getElementById('final-overkill-damage-1');
+    const finalOverkillDamage2El = document.getElementById('final-overkill-damage-2');
+    const finalOverkillDamage3El = document.getElementById('final-overkill-damage-3');
+    const finalOverkillDamage4El = document.getElementById('final-overkill-damage-4');
+    const finalOverkillDamage5El = document.getElementById('final-overkill-damage-5');
+    const finalOverkillDamage6El = document.getElementById('final-overkill-damage-6');
+
+
+    const controls = {
+        enemyHealth: document.getElementById('enemyHealth'),
+        enemyDamage: document.getElementById('enemyDamage'),
+        spawnRate: document.getElementById('spawnRate'),
+        spawnRateReduction: document.getElementById('spawnRateReduction'),
+        spawnReductionInterval: document.getElementById('spawnReductionInterval'),
+        spawnCount: document.getElementById('spawnCount'),
+        spawnAccelerationCount: document.getElementById('spawnAccelerationCount'),
+        growthRate: document.getElementById('growthRate'),
+        moveSpeed: document.getElementById('moveSpeed'),
+        maxEnemies: document.getElementById('maxEnemies'),
+        masterLevel: document.getElementById('masterLevel'),
+        autoUpgradeEnabled: document.getElementById('autoUpgradeEnabled'),
+        skill1Enabled: document.getElementById('skill1Enabled'),
+        level1: document.getElementById('level1'),
+        skill2Enabled: document.getElementById('skill2Enabled'),
+        level2: document.getElementById('level2'),
+        skill3Enabled: document.getElementById('skill3Enabled'),
+        level3: document.getElementById('level3'),
+        skill4Enabled: document.getElementById('skill4Enabled'),
+        level4: document.getElementById('level4'),
+        skill5Enabled: document.getElementById('skill5Enabled'),
+        level5: document.getElementById('level5'),
+        skill6Enabled: document.getElementById('skill6Enabled'),
+        level6: document.getElementById('level6'),
+    };
+    const controlValues = {
+        enemyHealthValue: document.getElementById('enemyHealthValue'),
+        enemyDamageValue: document.getElementById('enemyDamageValue'),
+        spawnRateValue: document.getElementById('spawnRateValue'),
+        spawnRateReductionValue: document.getElementById('spawnRateReductionValue'),
+        spawnReductionIntervalValue: document.getElementById('spawnReductionIntervalValue'),
+        spawnCountValue: document.getElementById('spawnCountValue'),
+        spawnAccelerationCountValue: document.getElementById('spawnAccelerationCountValue'),
+        growthRateValue: document.getElementById('growthRateValue'),
+        moveSpeedValue: document.getElementById('moveSpeedValue'),
+        maxEnemiesValue: document.getElementById('maxEnemiesValue'),
+        masterLevelValue: document.getElementById('masterLevelValue'),
+        level1Value: document.getElementById('level1Value'),
+        cooldown1Display: document.getElementById('cooldown1Display'),
+        count1Display: document.getElementById('count1Display'),
+        speed1Display: document.getElementById('speed1Display'),
+        radius1Display: document.getElementById('radius1Display'),
+        damage1Display: document.getElementById('damage1Display'),
+        level2Value: document.getElementById('level2Value'),
+        cooldown2Display: document.getElementById('cooldown2Display'),
+        radius2Display: document.getElementById('radius2Display'),
+        damage2Display: document.getElementById('damage2Display'),
+        level3Value: document.getElementById('level3Value'),
+        cooldown3Display: document.getElementById('cooldown3Display'),
+        count3Display: document.getElementById('count3Display'),
+        duration3Display: document.getElementById('duration3Display'),
+        orbitSpeed3Display: document.getElementById('orbitSpeed3Display'),
+        orbitRadius3Display: document.getElementById('orbitRadius3Display'),
+        radius3Display: document.getElementById('radius3Display'),
+        damage3Display: document.getElementById('damage3Display'),
+        level4Value: document.getElementById('level4Value'),
+        cooldown4Display: document.getElementById('cooldown4Display'),
+        speed4Display: document.getElementById('speed4Display'),
+        radius4Display: document.getElementById('radius4Display'),
+        damage4Display: document.getElementById('damage4Display'),
+        explosionRadius4Display: document.getElementById('explosionRadius4Display'),
+        explosionDamage4Display: document.getElementById('explosionDamage4Display'),
+        level5Value: document.getElementById('level5Value'),
+        cooldown5Display: document.getElementById('cooldown5Display'),
+        count5Display: document.getElementById('count5Display'),
+        duration5Display: document.getElementById('duration5Display'),
+        radius5Display: document.getElementById('radius5Display'),
+        initialDamage5Display: document.getElementById('initialDamage5Display'),
+        dotDamage5Display: document.getElementById('dotDamage5Display'),
+        dotInterval5Display: document.getElementById('dotInterval5Display'),
+        level6Value: document.getElementById('level6Value'),
+        cooldown6Display: document.getElementById('cooldown6Display'),
+        duration6Display: document.getElementById('duration6Display'),
+        count6Display: document.getElementById('count6Display'),
+        radius6Display: document.getElementById('radius6Display'),
+        speed6Display: document.getElementById('speed6Display'),
+        damage6Display: document.getElementById('damage6Display'),
+        subFireInterval6Display: document.getElementById('subFireInterval6Display'),
+        subDamage6Display: document.getElementById('subDamage6Display'),
+        subSpeed6Display: document.getElementById('subSpeed6Display'),
+        subDuration6Display: document.getElementById('subDuration6Display'),
+        subRadius6Display: document.getElementById('subRadius6Display'),
+    };
+
+    let player, enemies, projectiles, effects, orbitingSpheres, bouncingOrbs, damageFields, piercingProjectiles;
+    let score, gameTime, lastSpawnTime, totalDamageDealt1, totalDamageDealt2, totalDamageDealt3, totalDamageDealt4, totalDamageDealt5, totalDamageDealt6, totalDamageTaken;
+    let totalOverkillDamage1, totalOverkillDamage2, totalOverkillDamage3, totalOverkillDamage4, totalOverkillDamage5, totalOverkillDamage6;
+    let activations1, hits1, activations2, hits2, activations3, hits3, activations4, hits4, activations5, hits5, activations6, hits6;
+    let gameOver, animationFrameId, damageLog, lastLogTime;
+    let upgradedAt30, upgradedAt60, upgradedAt90;
+    let enemyBaseHealth, enemyCollisionDamage, initialSpawnInterval, currentSpawnInterval, enemySpawnRateReduction, enemySpawnReductionInterval, lastSpawnReductionTime, enemySpawnCount, currentSpawnCount, enemyHealthGrowthFactor, currentEnemyHealthMultiplier, enemyMoveSpeed, maxEnemiesAllowed;
+    let isSkill1Enabled, isSkill2Enabled, isSkill3Enabled, isSkill4Enabled, isSkill5Enabled, isSkill6Enabled, isAutoUpgradeEnabled;
+    let playerAttackCooldown1, playerProjectileCount1, playerProjectileSpeed1, playerProjectileRadius1, playerProjectileDamage1;
+    let playerAttackCooldown2, playerAreaRadius2, playerProjectileDamage2;
+    let playerAttackCooldown3, playerSphereCount3, playerDuration3, playerOrbitSpeed3, playerOrbitRadius3, playerSphereRadius3, playerDamage3;
+    let playerAttackCooldown4, playerProjectileSpeed4, playerProjectileRadius4, playerDamage4, playerExplosionRadius4, playerExplosionDamage4;
+    let playerAttackCooldown5, playerSkillCount5, playerDuration5, playerSkillRadius5, playerInitialDamage5, playerDotDamage5, playerDotInterval5;
+    let playerAttackCooldown6, playerDuration6, playerSphereCount6, playerSphereRadius6, playerSpeed6, playerDamage6,
+        playerSubFireInterval6, playerSubDamage6, playerSubSpeed6, playerSubDuration6, playerSubRadius6;
+    
+    let lastTime; 
+
+    const GAME_DURATION = 120;
+    const ENEMY_DAMAGE_COOLDOWN = 300;
+    const ORBIT_HIT_COOLDOWN = 500;
+    const BOUNCE_HIT_COOLDOWN = 500;
+    const PIERCING_HIT_COOLDOWN = 500;
+
+    // --- 類別定義 ---
+    class Player {
+        constructor(x, y, radius, color) {
+            this.x = x; this.y = y; this.radius = radius; this.color = color;
+            this.lastAttackTime1 = 0;
+            this.lastAttackTime2 = 0;
+            this.lastAttackTime3 = 0;
+            this.lastAttackTime4 = 0;
+            this.lastAttackTime5 = 0;
+            this.lastAttackTime6 = 0;
+        }
+        draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill(); }
+        update() {
+            if (gameOver) return;
+            const now = Date.now();
+
+            if (isSkill1Enabled && now - this.lastAttackTime1 > playerAttackCooldown1) { this.shootPrimary(); this.lastAttackTime1 = now; }
+            if (isSkill2Enabled && now - this.lastAttackTime2 > playerAttackCooldown2) { this.shootSecondary(); this.lastAttackTime2 = now; }
+            if (isSkill3Enabled && now - this.lastAttackTime3 > playerAttackCooldown3) { this.shootThird(); this.lastAttackTime3 = now; }
+            if (isSkill4Enabled && now - this.lastAttackTime4 > playerAttackCooldown4) { this.shootFourth(); this.lastAttackTime4 = now; }
+            if (isSkill5Enabled && now - this.lastAttackTime5 > playerAttackCooldown5) { this.shootFifth(); this.lastAttackTime5 = now; }
+            if (isSkill6Enabled && now - this.lastAttackTime6 > playerAttackCooldown6) { this.shootSixth(); this.lastAttackTime6 = now; }
+
+            this.draw();
+        }
+        shootPrimary() { 
+            activations1++;
+            this.shootWithColor('white', playerProjectileDamage1, 1, playerProjectileCount1, playerProjectileSpeed1, playerProjectileRadius1); 
+        }
+        
+        shootSecondary() {
+            activations2++;
+            effects.push(new AreaOfEffect(this.x, this.y, playerAreaRadius2, 'hsla(0, 100%, 60%, 0.5)', 200, true));
+            enemies.forEach((enemy) => {
+                const dist = Math.hypot(this.x - enemy.x, this.y - enemy.y);
+                if (dist - enemy.radius < playerAreaRadius2) {
+                    hits2++;
+                    const damage = playerProjectileDamage2;
+                    const actualDamage = Math.min(damage, enemy.health);
+                    const overkill = damage - actualDamage;
+                    totalDamageDealt2 += actualDamage;
+                    totalOverkillDamage2 += overkill;
+                    enemy.health -= actualDamage;
+                }
+            });
+            this.checkEnemyHealth();
+        }
+        
+        shootThird() {
+            activations3++;
+            for (let i = 0; i < playerSphereCount3; i++) {
+                const angle = (Math.PI * 2 / playerSphereCount3) * i;
+                orbitingSpheres.push(new OrbitingSphere(
+                    playerSphereRadius3, 'hsl(210, 100%, 60%)', playerOrbitRadius3, 
+                    playerOrbitSpeed3, playerDamage3, playerDuration3, angle
+                ));
+            }
+        }
+        
+        shootFourth() { 
+            activations4++;
+            this.shootWithColor('hsl(120, 100%, 60%)', playerDamage4, 4, 1, playerProjectileSpeed4, playerProjectileRadius4); 
+        }
+
+        shootFifth() {
+            activations5++;
+            if (enemies.length === 0) return;
+            const shuffledEnemies = [...enemies].sort(() => 0.5 - Math.random());
+            const targets = shuffledEnemies.slice(0, playerSkillCount5);
+
+            targets.forEach(target => {
+                effects.push(new AreaOfEffect(target.x, target.y, playerSkillRadius5, 'hsla(55, 100%, 50%, 0.8)', 200, false));
+                enemies.forEach(enemy => {
+                    const dist = Math.hypot(target.x - enemy.x, target.y - enemy.y);
+                    if (dist - enemy.radius < playerSkillRadius5) {
+                        hits5++;
+                        const damage = playerInitialDamage5;
+                        const actualDamage = Math.min(damage, enemy.health);
+                        const overkill = damage - actualDamage;
+                        totalDamageDealt5 += actualDamage;
+                        totalOverkillDamage5 += overkill;
+                        enemy.health -= actualDamage;
+                    }
+                });
+
+                damageFields.push(new DamageField(
+                    target.x, target.y, playerSkillRadius5, 'hsla(55, 100%, 50%, 0.5)',
+                    playerDuration5, playerDotDamage5, playerDotInterval5
+                ));
+            });
+            this.checkEnemyHealth();
+        }
+
+        shootSixth() {
+            activations6++;
+            for (let i = 0; i < playerSphereCount6; i++) {
+                bouncingOrbs.push(new BouncingOrb(
+                    this.x, this.y, playerSphereRadius6, 'hsl(270, 100%, 60%)',
+                    playerSpeed6, playerDamage6, playerDuration6
+                ));
+            }
+        }
+
+        shootWithColor(color, damage, skillId, count, speed, radius) {
+            if (enemies.length === 0) return;
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    if(gameOver) return;
+                    let nearestEnemy = null, minDistance = Infinity;
+                    enemies.forEach(enemy => {
+                        const distance = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+                        if (distance < minDistance) { minDistance = distance; nearestEnemy = enemy; }
+                    });
+                    if (nearestEnemy) {
+                        const angle = Math.atan2(nearestEnemy.y - this.y, nearestEnemy.x - this.x);
+                        const velocity = { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed };
+                        projectiles.push(new Projectile(this.x, this.y, radius, color, velocity, damage, skillId));
+                    }
+                }, i * 50);
+            }
+        }
+
+        checkEnemyHealth() {
+             enemies = enemies.filter(enemy => {
+                if (enemy.health <= 0) {
+                    score += 100;
+                    return false;
+                }
+                return true;
+            });
+        }
+    }
+
+    class Projectile {
+        constructor(x, y, radius, color, velocity, damage, skillId) {
+            this.x = x; this.y = y; this.radius = radius; this.color = color; this.velocity = velocity; this.damage = damage;
+            this.skillId = skillId;
+        }
+        draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill(); }
+        update(deltaTime) {
+            this.x += this.velocity.x * (deltaTime / 1000); 
+            this.y += this.velocity.y * (deltaTime / 1000);
+            this.draw(); 
+        }
+    }
+
+    class AreaOfEffect {
+        constructor(x, y, radius, color, duration, followsPlayer = false) {
+            this.x = x; this.y = y; this.radius = radius; this.color = color;
+            this.duration = duration; this.maxDuration = duration;
+            this.followsPlayer = followsPlayer;
+        }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.duration / this.maxDuration;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            ctx.restore();
+        }
+        update(deltaTime) {
+            this.duration -= deltaTime;
+            if (this.followsPlayer) {
+                this.x = player.x;
+                this.y = player.y;
+            }
+        }
+    }
+
+    class OrbitingSphere {
+        constructor(radius, color, orbitRadius, orbitSpeed, damage, duration, initialAngle) {
+            this.radius = radius; this.color = color; this.orbitRadius = orbitRadius;
+            this.orbitSpeed = orbitSpeed; this.damage = damage; this.duration = duration;
+            this.angle = initialAngle;
+            this.x = player.x + Math.cos(this.angle) * this.orbitRadius;
+            this.y = player.y + Math.sin(this.angle) * this.orbitRadius;
+            this.hitEnemies = new Map();
+        }
+        draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill(); }
+        update(deltaTime) {
+            this.duration -= deltaTime;
+            this.angle += this.orbitSpeed * (deltaTime / 1000);
+            this.x = player.x + Math.cos(this.angle) * this.orbitRadius;
+            this.y = player.y + Math.sin(this.angle) * this.orbitRadius;
+            this.draw();
+        }
+    }
+
+    class BouncingOrb {
+        constructor(x, y, radius, color, speed, damage, duration) {
+            this.x = x; this.y = y; this.radius = radius; this.color = color;
+            this.damage = damage; this.duration = duration;
+            const angle = Math.random() * Math.PI * 2;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            this.hitEnemies = new Map();
+            this.lastFireTime = 0;
+            this.fireAngle = -Math.PI / 2;
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+        }
+        update(deltaTime, currentTime) {
+            this.duration -= deltaTime;
+            this.x += this.vx * (deltaTime / 1000);
+            this.y += this.vy * (deltaTime / 1000);
+
+            if (this.x - this.radius < 0 && this.vx < 0) this.vx *= -1;
+            if (this.x + this.radius > canvas.width && this.vx > 0) this.vx *= -1;
+            if (this.y - this.radius < 0 && this.vy < 0) this.vy *= -1;
+            if (this.y + this.radius > canvas.height && this.vy > 0) this.vy *= -1;
+
+            if (currentTime - this.lastFireTime > playerSubFireInterval6) {
+                this.lastFireTime = currentTime;
+                this.fireSubProjectile();
+            }
+
+            this.draw();
+        }
+        fireSubProjectile() {
+            const velocity = {
+                x: Math.cos(this.fireAngle) * playerSubSpeed6,
+                y: Math.sin(this.fireAngle) * playerSubSpeed6
+            };
+            piercingProjectiles.push(new PiercingProjectile(
+                this.x, this.y, playerSubRadius6, 'rgba(200, 150, 255, 0.8)',
+                velocity, playerSubDamage6, playerSubDuration6
+            ));
+            this.fireAngle += Math.PI / 4;
+        }
+    }
+    
+    class PiercingProjectile {
+        constructor(x, y, radius, color, velocity, damage, duration) {
+            this.x = x; this.y = y; this.radius = radius; this.color = color;
+            this.velocity = velocity; this.damage = damage; this.duration = duration;
+            this.hitEnemies = new Map();
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+        }
+        update(deltaTime) {
+            this.duration -= deltaTime;
+            this.x += this.velocity.x * (deltaTime / 1000);
+            this.y += this.velocity.y * (deltaTime / 1000);
+            this.draw();
+        }
+    }
+
+    class DamageField {
+        constructor(x, y, radius, color, duration, damage, tickInterval) {
+            this.x = x; this.y = y; this.radius = radius; this.color = color;
+            this.duration = duration; this.maxDuration = duration;
+            this.damage = damage;
+            this.tickInterval = tickInterval;
+            this.lastTickTime = 0;
+        }
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = (this.duration / this.maxDuration) * 0.7;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            ctx.restore();
+        }
+        update(deltaTime) {
+            this.duration -= deltaTime;
+        }
+    }
+
+    class Enemy {
+        constructor(x, y, radius, color, velocity, health) {
+            this.x = x; this.y = y; this.radius = radius; this.color = color; this.velocity = velocity; this.health = health;
+            this.lastDamageTime = 0;
+        }
+        draw() { ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false); ctx.fillStyle = this.color; ctx.fill(); }
+        update(deltaTime) {
+            const angle = Math.atan2(player.y - this.y, player.x - this.x);
+            this.velocity.x = Math.cos(angle) * enemyMoveSpeed;
+            this.velocity.y = Math.sin(angle) * enemyMoveSpeed;
+            this.x += this.velocity.x * (deltaTime / 1000);
+            this.y += this.velocity.y * (deltaTime / 1000);
+            this.draw();
+        }
+    }
+
+    // --- 遊戲流程與狀態管理 ---
+    function resizeCanvas() {
+        const container = document.getElementById('game-container');
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        const targetAspectRatio = 1.8; // Height / Width
+
+        let newWidth, newHeight;
+
+        if (containerHeight / targetAspectRatio > containerWidth) {
+            newWidth = containerWidth;
+            newHeight = containerWidth * targetAspectRatio;
+        } else {
+            newHeight = containerHeight;
+            newWidth = containerHeight / targetAspectRatio;
+        }
+
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        
+        if (player) {
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+        }
+        if (resolutionDisplayEl) {
+            resolutionDisplayEl.textContent = `${Math.round(canvas.height)}x${Math.round(canvas.width)}`;
+        }
+    }
+
+    function resetGame() {
+        if(animationFrameId) cancelAnimationFrame(animationFrameId);
+        gameOver = false;
+        gameOverScreen.style.display = 'none';
+        score = 0;
+        gameTime = 0;
+        lastSpawnTime = 0;
+        lastSpawnReductionTime = 0;
+        totalDamageDealt1 = 0; totalDamageDealt2 = 0; totalDamageDealt3 = 0; totalDamageDealt4 = 0; totalDamageDealt5 = 0; totalDamageDealt6 = 0;
+        totalOverkillDamage1 = 0; totalOverkillDamage2 = 0; totalOverkillDamage3 = 0; totalOverkillDamage4 = 0; totalOverkillDamage5 = 0; totalOverkillDamage6 = 0;
+        totalDamageTaken = 0;
+        activations1 = 0; hits1 = 0; activations2 = 0; hits2 = 0; activations3 = 0; hits3 = 0;
+        activations4 = 0; hits4 = 0; activations5 = 0; hits5 = 0; activations6 = 0; hits6 = 0;
+        lastTime = undefined; 
+        upgradedAt30 = false;
+        upgradedAt60 = false;
+        upgradedAt90 = false;
+        
+        resizeCanvas();
+        player = new Player(canvas.width / 2, canvas.height / 2, 18.8, 'hsl(200, 100%, 50%)');
+        
+        enemies = []; 
+        projectiles = [];
+        effects = [];
+        orbitingSpheres = [];
+        bouncingOrbs = [];
+        damageFields = [];
+        piercingProjectiles = [];
+        currentSpawnInterval = initialSpawnInterval;
+        currentSpawnCount = enemySpawnCount;
+        currentEnemyHealthMultiplier = 1;
+        damageLog = [];
+        lastLogTime = 0;
+        document.getElementById('damage-log-table').innerHTML = '';
+        updateUI(0); 
+        animationFrameId = requestAnimationFrame(animate);
+    }
+
+    function endGame() {
+        if (gameOver) return; 
+        gameOver = true;
+        cancelAnimationFrame(animationFrameId);
+        finalScoreEl.textContent = score;
+        finalDamageDealt1El.textContent = totalDamageDealt1;
+        finalDamageDealt2El.textContent = totalDamageDealt2;
+        finalDamageDealt3El.textContent = totalDamageDealt3;
+        finalDamageDealt4El.textContent = totalDamageDealt4;
+        finalDamageDealt5El.textContent = totalDamageDealt5;
+        finalDamageDealt6El.textContent = totalDamageDealt6;
+        finalDamageTakenEl.textContent = totalDamageTaken;
+        finalOverkillDamage1El.textContent = totalOverkillDamage1;
+        finalOverkillDamage2El.textContent = totalOverkillDamage2;
+        finalOverkillDamage3El.textContent = totalOverkillDamage3;
+        finalOverkillDamage4El.textContent = totalOverkillDamage4;
+        finalOverkillDamage5El.textContent = totalOverkillDamage5;
+        finalOverkillDamage6El.textContent = totalOverkillDamage6;
+
+        const statsWrapper = document.getElementById('stats-details-wrapper');
+        statsWrapper.classList.add('hidden');
+        toggleStatsButton.innerText = '顯示詳細資訊';
+
+        gameOverScreen.style.display = 'flex';
+
+        const efficiencyStatsEl = document.getElementById('efficiency-stats');
+        let efficiencyHTML = `<h2 class="text-xl font-bold mb-2 text-center">技能效益分析</h2>`;
+        const skills = ['苦無', '力場', '守衛', '火箭', '雷電', '榴槤'];
+        const activations = [activations1, activations2, activations3, activations4, activations5, activations6];
+        const hits = [hits1, hits2, hits3, hits4, hits5, hits6];
+        const damages = [totalDamageDealt1, totalDamageDealt2, totalDamageDealt3, totalDamageDealt4, totalDamageDealt5, totalDamageDealt6];
+        const overkills = [totalOverkillDamage1, totalOverkillDamage2, totalOverkillDamage3, totalOverkillDamage4, totalOverkillDamage5, totalOverkillDamage6];
+
+        for (let i = 0; i < skills.length; i++) {
+            if (activations[i] > 0) {
+                const hitRate = hits[i] > 0 ? ((hits[i] / (activations[i] * (i === 0 ? playerProjectileCount1 : 1))) * 100).toFixed(1) : 0;
+                const damagePerHit = hits[i] > 0 ? (damages[i] / hits[i]).toFixed(0) : 0;
+                const overkillPerHit = hits[i] > 0 ? (overkills[i] / hits[i]).toFixed(1) : 0;
+                efficiencyHTML += `
+                    <div class="mb-2 p-1 bg-gray-700 rounded">
+                        <p class="font-bold">${skills[i]}:</p>
+                        <p>發動: ${activations[i]}, 命中: ${hits[i]}</p>
+                        <p>命中率: ${hitRate}%, 單次命中傷害: ${damagePerHit}</p>
+                        <p>總傷害: ${damages[i]}, 總溢傷: <span class="text-yellow-400">${overkills[i]}</span> (平均 ${overkillPerHit})</p>
+                    </div>
+                `;
+            }
+        }
+        efficiencyStatsEl.innerHTML = efficiencyHTML;
+
+
+        const table = document.getElementById('damage-log-table');
+        let tableHTML = `
+            <thead class="text-xs text-gray-400 uppercase bg-gray-700 sticky top-0">
+                <tr>
+                    <th scope="col" class="px-1 py-1">秒</th>
+                    <th scope="col" class="px-1 py-1">苦無傷</th>
+                    <th scope="col" class="px-1 py-1 text-yellow-400">溢</th>
+                    <th scope="col" class="px-1 py-1">力場傷</th>
+                    <th scope="col" class="px-1 py-1 text-yellow-400">溢</th>
+                    <th scope="col" class="px-1 py-1">守衛傷</th>
+                    <th scope="col" class="px-1 py-1 text-yellow-400">溢</th>
+                    <th scope="col" class="px-1 py-1">火箭傷</th>
+                    <th scope="col" class="px-1 py-1 text-yellow-400">溢</th>
+                    <th scope="col" class="px-1 py-1">雷電傷</th>
+                    <th scope="col" class="px-1 py-1 text-yellow-400">溢</th>
+                    <th scope="col" class="px-1 py-1">榴槤傷</th>
+                    <th scope="col" class="px-1 py-1 text-yellow-400">溢</th>
+                </tr>
+            </thead>
+            <tbody class="text-xs">
+        `;
+        damageLog.forEach(log => {
+            tableHTML += `
+                <tr class="bg-gray-800 border-b border-gray-700">
+                    <td class="px-1 py-1">${log.time}</td>
+                    <td class="px-1 py-1">${log.d1}</td>
+                    <td class="px-1 py-1 text-yellow-400">${log.o1}</td>
+                    <td class="px-1 py-1">${log.d2}</td>
+                    <td class="px-1 py-1 text-yellow-400">${log.o2}</td>
+                    <td class="px-1 py-1">${log.d3}</td>
+                    <td class="px-1 py-1 text-yellow-400">${log.o3}</td>
+                    <td class="px-1 py-1">${log.d4}</td>
+                    <td class="px-1 py-1 text-yellow-400">${log.o4}</td>
+                    <td class="px-1 py-1">${log.d5}</td>
+                    <td class="px-1 py-1 text-yellow-400">${log.o5}</td>
+                    <td class="px-1 py-1">${log.d6}</td>
+                    <td class="px-1 py-1 text-yellow-400">${log.o6}</td>
+                </tr>
+            `;
+        });
+        tableHTML += '</tbody>';
+        table.innerHTML = tableHTML;
+    }
+
+    // --- 遊戲主迴圈 ---
+    function animate(currentTime) {
+        animationFrameId = requestAnimationFrame(animate);
+        if (lastTime === undefined) { lastTime = currentTime; }
+        const deltaTime = currentTime - lastTime;
+        lastTime = currentTime;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if (gameOver) {
+            player.draw();
+            enemies.forEach(enemy => enemy.draw());
+            projectiles.forEach(projectile => projectile.draw());
+            orbitingSpheres.forEach(sphere => sphere.draw());
+            bouncingOrbs.forEach(orb => orb.draw());
+            damageFields.forEach(field => field.draw());
+            piercingProjectiles.forEach(p => p.draw());
+            return;
+        }
+
+        if (gameTime >= GAME_DURATION) {
+            endGame();
+            return;
+        }
+
+        player.update();
+        spawnEnemies(currentTime);
+
+        if (gameTime - lastLogTime >= 1) {
+            damageLog.push({
+                time: Math.floor(gameTime),
+                d1: totalDamageDealt1,
+                o1: totalOverkillDamage1,
+                d2: totalDamageDealt2,
+                o2: totalOverkillDamage2,
+                d3: totalDamageDealt3,
+                o3: totalOverkillDamage3,
+                d4: totalDamageDealt4,
+                o4: totalOverkillDamage4,
+                d5: totalDamageDealt5,
+                o5: totalOverkillDamage5,
+                d6: totalDamageDealt6,
+                o6: totalOverkillDamage6,
+            });
+            lastLogTime = gameTime;
+        }
+
+        if (isAutoUpgradeEnabled) {
+            if (gameTime >= 30 && !upgradedAt30) {
+                upgradeAllSkills(2);
+                upgradedAt30 = true;
+            }
+            if (gameTime >= 60 && !upgradedAt60) {
+                upgradeAllSkills(3);
+                upgradedAt60 = true;
+            }
+            if (gameTime >= 90 && !upgradedAt90) {
+                upgradeAllSkills(4);
+                upgradedAt90 = true;
+            }
+        }
+
+        projectiles.forEach((p, i) => { p.update(deltaTime); if (p.x < 0 || p.x > canvas.width || p.y < 0 || p.y > canvas.height) { projectiles.splice(i, 1); } });
+        effects.forEach((effect, i) => { effect.update(deltaTime); effect.draw(); if (effect.duration <= 0) { effects.splice(i, 1); } });
+        
+        orbitingSpheres.forEach((sphere, sphereIndex) => {
+            sphere.update(deltaTime);
+            if (sphere.duration <= 0) { orbitingSpheres.splice(sphereIndex, 1); return; }
+            enemies.forEach((enemy, enemyIndex) => {
+                if (!enemy) return;
+                const dist = Math.hypot(sphere.x - enemy.x, sphere.y - enemy.y);
+                if (dist < sphere.radius + enemy.radius) {
+                    const lastHitTime = sphere.hitEnemies.get(enemy);
+                    if (!lastHitTime || currentTime - lastHitTime > ORBIT_HIT_COOLDOWN) {
+                        hits3++;
+                        const damage = sphere.damage;
+                        const actualDamage = Math.min(damage, enemy.health);
+                        const overkill = damage - actualDamage;
+                        enemy.health -= actualDamage;
+                        totalDamageDealt3 += actualDamage;
+                        totalOverkillDamage3 += overkill;
+                        
+                        sphere.hitEnemies.set(enemy, currentTime);
+                        if (enemy.health <= 0) { score += 100; enemies.splice(enemyIndex, 1); }
+                    }
+                }
+            });
+        });
+
+        bouncingOrbs.forEach((orb, orbIndex) => {
+            orb.update(deltaTime, currentTime);
+            if (orb.duration <= 0) { bouncingOrbs.splice(orbIndex, 1); return; }
+            enemies.forEach((enemy, enemyIndex) => {
+                if (!enemy) return;
+                const dist = Math.hypot(orb.x - enemy.x, orb.y - enemy.y);
+                if (dist < orb.radius + enemy.radius) {
+                    const lastHitTime = orb.hitEnemies.get(enemy);
+                    if (!lastHitTime || currentTime - lastHitTime > BOUNCE_HIT_COOLDOWN) {
+                        hits6++;
+                        const damage = orb.damage;
+                        const actualDamage = Math.min(damage, enemy.health);
+                        const overkill = damage - actualDamage;
+                        enemy.health -= actualDamage;
+                        totalDamageDealt6 += actualDamage;
+                        totalOverkillDamage6 += overkill;
+
+                        orb.hitEnemies.set(enemy, currentTime);
+                        if (enemy.health <= 0) { score += 100; enemies.splice(enemyIndex, 1); }
+                    }
+                }
+            });
+        });
+
+        damageFields.forEach((field, fieldIndex) => {
+            field.update(deltaTime);
+            field.draw();
+            if (field.duration <= 0) {
+                damageFields.splice(fieldIndex, 1);
+                return;
+            }
+
+            if (currentTime - field.lastTickTime > field.tickInterval) {
+                field.lastTickTime = currentTime;
+                enemies.forEach(enemy => {
+                    const dist = Math.hypot(field.x - enemy.x, field.y - enemy.y);
+                    if (dist - enemy.radius < field.radius) {
+                        hits5++;
+                        const damage = field.damage;
+                        const actualDamage = Math.min(damage, enemy.health);
+                        const overkill = damage - actualDamage;
+                        enemy.health -= actualDamage;
+                        totalDamageDealt5 += actualDamage;
+                        totalOverkillDamage5 += overkill;
+                    }
+                });
+                player.checkEnemyHealth();
+            }
+        });
+
+        piercingProjectiles.forEach((p, pIndex) => {
+            p.update(deltaTime);
+            if (p.duration <= 0) { piercingProjectiles.splice(pIndex, 1); return; }
+            enemies.forEach((enemy, enemyIndex) => {
+                if (!enemy) return;
+                const dist = Math.hypot(p.x - enemy.x, p.y - enemy.y);
+                if (dist < p.radius + enemy.radius) {
+                    const lastHitTime = p.hitEnemies.get(enemy);
+                    if (!lastHitTime || currentTime - lastHitTime > PIERCING_HIT_COOLDOWN) {
+                        hits6++;
+                        const damage = p.damage;
+                        const actualDamage = Math.min(damage, enemy.health);
+                        const overkill = damage - actualDamage;
+                        enemy.health -= actualDamage;
+                        totalDamageDealt6 += actualDamage;
+                        totalOverkillDamage6 += overkill;
+
+                        p.hitEnemies.set(enemy, currentTime);
+                        if (enemy.health <= 0) { score += 100; enemies.splice(enemyIndex, 1); }
+                    }
+                }
+            });
+        });
+
+        enemies.forEach((e, eIndex) => {
+            if (!e) return;
+            e.update(deltaTime);
+            projectiles.forEach((p, pIndex) => {
+                if (!e || !p) return; 
+                const distProjEnemy = Math.hypot(p.x - e.x, p.y - e.y);
+                if (distProjEnemy - e.radius - p.radius < 1) {
+                    const baseDamage = p.damage;
+                    if (p.skillId === 4) { // Rocket
+                        hits4++;
+                        const actualDirectDamage = Math.min(baseDamage, e.health);
+                        const overkillDirect = baseDamage - actualDirectDamage;
+                        e.health -= actualDirectDamage;
+                        totalDamageDealt4 += actualDirectDamage;
+                        totalOverkillDamage4 += overkillDirect;
+
+                        effects.push(new AreaOfEffect(e.x, e.y, playerExplosionRadius4, 'hsla(120, 100%, 50%, 0.5)', 200, false));
+                        
+                        enemies.forEach(otherEnemy => {
+                            if (otherEnemy === e) return;
+                            const explosionDist = Math.hypot(e.x - otherEnemy.x, e.y - otherEnemy.y);
+                            if (explosionDist - otherEnemy.radius < playerExplosionRadius4) {
+                                hits4++;
+                                const explosionDamage = playerExplosionDamage4;
+                                const actualSplashDamage = Math.min(explosionDamage, otherEnemy.health);
+                                const overkillSplash = explosionDamage - actualSplashDamage;
+                                otherEnemy.health -= actualSplashDamage;
+                                totalDamageDealt4 += actualSplashDamage;
+                                totalOverkillDamage4 += overkillSplash;
+                            }
+                        });
+                    } else if (p.skillId === 1) { // Kunai
+                        hits1++;
+                        const actualDamage = Math.min(baseDamage, e.health);
+                        const overkill = baseDamage - actualDamage;
+                        e.health -= actualDamage;
+                        totalDamageDealt1 += actualDamage;
+                        totalOverkillDamage1 += overkill;
+                    }
+                    projectiles.splice(pIndex, 1);
+                    player.checkEnemyHealth();
+                }
+            });
+
+            if (!e) return;
+            const distPlayerEnemy = Math.hypot(player.x - e.x, player.y - e.y);
+            if (distPlayerEnemy - e.radius - player.radius < 1) {
+                if (currentTime - e.lastDamageTime > ENEMY_DAMAGE_COOLDOWN) {
+                    totalDamageTaken += enemyCollisionDamage;
+                    e.lastDamageTime = currentTime;
+                }
+            }
+        });
+
+        for (let i = 0; i < enemies.length; i++) {
+            for (let j = i + 1; j < enemies.length; j++) {
+                const e1 = enemies[i];
+                const e2 = enemies[j];
+                const dist = Math.hypot(e1.x - e2.x, e1.y - e2.y);
+                const min_dist = e1.radius + e2.radius;
+                if (dist < min_dist) {
+                    const overlap = min_dist - dist;
+                    const angle = Math.atan2(e1.y - e2.y, e1.x - e2.x);
+                    const moveX = Math.cos(angle) * overlap / 2;
+                    const moveY = Math.sin(angle) * overlap / 2;
+                    e1.x += moveX; e1.y += moveY;
+                    e2.x -= moveX; e2.y -= moveY;
+                }
+            }
+        }
+
+        updateUI(deltaTime);
+    }
+
+    // --- 生成與UI更新 ---
+    function spawnEnemies(currentTime) {
+        if (currentTime - lastSpawnReductionTime > enemySpawnReductionInterval) {
+            const minSpawnInterval = parseFloat(controls.spawnRate.min);
+            currentSpawnInterval = Math.max(minSpawnInterval, currentSpawnInterval - enemySpawnRateReduction);
+            currentSpawnCount += enemySpawnAccelerationCount;
+            currentEnemyHealthMultiplier *= enemyHealthGrowthFactor;
+            lastSpawnReductionTime = currentTime;
+        }
+
+        if (currentTime - lastSpawnTime > currentSpawnInterval && enemies.length < maxEnemiesAllowed) {
+            lastSpawnTime = currentTime;
+            for (let i = 0; i < currentSpawnCount; i++) {
+                if (enemies.length >= maxEnemiesAllowed) break;
+                const radius = 18.8;
+                let x, y;
+                if (Math.random() < 0.5) {
+                    x = Math.random() < 0.5 ? 0 - radius : canvas.width + radius;
+                    y = Math.random() * canvas.height;
+                } else {
+                    x = Math.random() * canvas.width;
+                    y = Math.random() < 0.5 ? 0 - radius : canvas.height + radius;
+                }
+                const color = '#991B1B';
+                const health = Math.floor(enemyBaseHealth * currentEnemyHealthMultiplier);
+                enemies.push(new Enemy(x, y, radius, color, {x:0, y:0}, health));
+            }
+        }
+    }
+
+    function updateUI(deltaTime) {
+        if (deltaTime > 0) gameTime += deltaTime / 1000;
+        timerEl.textContent = `${Math.min(Math.floor(gameTime), GAME_DURATION)}/${GAME_DURATION}`;
+        scoreEl.textContent = score;
+        damageDealt1El.textContent = totalDamageDealt1;
+        damageDealt2El.textContent = totalDamageDealt2;
+        damageDealt3El.textContent = totalDamageDealt3;
+        damageDealt4El.textContent = totalDamageDealt4;
+        damageDealt5El.textContent = totalDamageDealt5;
+        damageDealt6El.textContent = totalDamageDealt6;
+        damageTakenEl.textContent = totalDamageTaken;
+        enemyCountEl.textContent = `${enemies.length}/${maxEnemiesAllowed}`;
+    }
+
+    const skillPresets = {
+        1: { // 苦無
+            levels: [
+                { cooldown: 1500, count: 1, speed: 360, radius: 3, damage: 300 },
+                { cooldown: 1500, count: 2, speed: 360, radius: 3, damage: 600 },
+                { cooldown: 1500, count: 3, speed: 360, radius: 3, damage: 900 },
+                { cooldown: 200, count: 1, speed: 360, radius: 3, damage: 1200 },
+            ]
+        },
+        2: { // 力場
+            levels: [
+                { cooldown: 500, radius: 47, damage: 100 },
+                { cooldown: 500, radius: 56.4, damage: 150 },
+                { cooldown: 500, radius: 65.8, damage: 200 },
+                { cooldown: 500, radius: 75.2, damage: 250 },
+            ]
+        },
+        3: { // 守衛
+            levels: [
+                { cooldown: 6000, count: 1, duration: 3000, orbitSpeed: 3, orbitRadius: 75.2, radius: 20, damage: 50 },
+                { cooldown: 6000, count: 2, duration: 3000, orbitSpeed: 3, orbitRadius: 75.2, radius: 20, damage: 60 },
+                { cooldown: 6000, count: 4, duration: 3000, orbitSpeed: 3, orbitRadius: 75.2, radius: 20, damage: 80 },
+                { cooldown: 6000, count: 6, duration: 6000, orbitSpeed: 3, orbitRadius: 75.2, radius: 20, damage: 100 },
+            ]
+        },
+        4: { // 火箭
+            levels: [
+                { cooldown: 3000, speed: 240, radius: 10, damage: 300, explosionRadius: 56.4, explosionDamage: 200 },
+                { cooldown: 3000, speed: 240, radius: 10, damage: 500, explosionRadius: 56.4, explosionDamage: 300 },
+                { cooldown: 3000, speed: 240, radius: 10, damage: 700, explosionRadius: 65.8, explosionDamage: 450 },
+                { cooldown: 3000, speed: 240, radius: 10, damage: 1000, explosionRadius: 75.2, explosionDamage: 800 },
+            ]
+        },
+        5: { // 雷電
+            levels: [
+                { cooldown: 2500, count: 1, duration: 0, radius: 65.8, initialDamage: 150, dotDamage: 0, tickInterval: 500 },
+                { cooldown: 2500, count: 2, duration: 0, radius: 65.8, initialDamage: 200, dotDamage: 0, tickInterval: 500 },
+                { cooldown: 2500, count: 3, duration: 0, radius: 65.8, initialDamage: 250, dotDamage: 0, tickInterval: 500 },
+                { cooldown: 2500, count: 3, duration: 3000, radius: 65.8, initialDamage: 300, dotDamage: 50, tickInterval: 500 },
+            ]
+        },
+        6: { // 榴槤
+            levels: [
+                { cooldown: 30000, duration: 30000, count: 1, radius: 28.2, speed: 150, damage: 200, subFireInterval: 300, subDamage: 0, subSpeed: 180, subDuration: 0, subRadius: 5 },
+                { cooldown: 30000, duration: 30000, count: 1, radius: 28.2, speed: 150, damage: 250, subFireInterval: 300, subDamage: 0, subSpeed: 180, subDuration: 0, subRadius: 5 },
+                { cooldown: 30000, duration: 30000, count: 1, radius: 37.6, speed: 150, damage: 250, subFireInterval: 300, subDamage: 0, subSpeed: 180, subDuration: 0, subRadius: 5 },
+                { cooldown: 30000, duration: 30000, count: 1, radius: 47, speed: 150, damage: 300, subFireInterval: 300, subDamage: 150, subSpeed: 180, subDuration: 625, subRadius: 5 },
+            ]
+        }
+    };
+
+    function updateSkillFromLevel(skillNum) {
+        const level = parseInt(controls[`level${skillNum}`].value);
+        const presets = skillPresets[skillNum].levels[level - 1];
+
+        controlValues[`level${skillNum}Value`].textContent = level;
+
+        switch(skillNum) {
+            case 1:
+                playerAttackCooldown1 = presets.cooldown;
+                playerProjectileCount1 = presets.count;
+                playerProjectileSpeed1 = presets.speed;
+                playerProjectileRadius1 = presets.radius;
+                playerProjectileDamage1 = presets.damage;
+                controlValues.cooldown1Display.textContent = presets.cooldown;
+                controlValues.count1Display.textContent = presets.count;
+                controlValues.speed1Display.textContent = presets.speed;
+                controlValues.radius1Display.textContent = presets.radius;
+                controlValues.damage1Display.textContent = presets.damage;
+                break;
+            case 2:
+                playerAttackCooldown2 = presets.cooldown;
+                playerAreaRadius2 = presets.radius;
+                playerProjectileDamage2 = presets.damage;
+                controlValues.cooldown2Display.textContent = presets.cooldown;
+                controlValues.radius2Display.textContent = presets.radius;
+                controlValues.damage2Display.textContent = presets.damage;
+                break;
+            case 3:
+                playerAttackCooldown3 = presets.cooldown;
+                playerSphereCount3 = presets.count;
+                playerDuration3 = presets.duration;
+                playerOrbitSpeed3 = presets.orbitSpeed;
+                playerOrbitRadius3 = presets.orbitRadius;
+                playerSphereRadius3 = presets.radius;
+                playerDamage3 = presets.damage;
+                controlValues.cooldown3Display.textContent = presets.cooldown;
+                controlValues.count3Display.textContent = presets.count;
+                controlValues.duration3Display.textContent = presets.duration;
+                controlValues.orbitSpeed3Display.textContent = presets.orbitSpeed;
+                controlValues.orbitRadius3Display.textContent = presets.orbitRadius;
+                controlValues.radius3Display.textContent = presets.radius;
+                controlValues.damage3Display.textContent = presets.damage;
+                break;
+            case 4:
+                playerAttackCooldown4 = presets.cooldown;
+                playerProjectileSpeed4 = presets.speed;
+                playerProjectileRadius4 = presets.radius;
+                playerDamage4 = presets.damage;
+                playerExplosionRadius4 = presets.explosionRadius;
+                playerExplosionDamage4 = presets.explosionDamage;
+                controlValues.cooldown4Display.textContent = presets.cooldown;
+                controlValues.speed4Display.textContent = presets.speed;
+                controlValues.radius4Display.textContent = presets.radius;
+                controlValues.damage4Display.textContent = presets.damage;
+                controlValues.explosionRadius4Display.textContent = presets.explosionRadius;
+                controlValues.explosionDamage4Display.textContent = presets.explosionDamage;
+                break;
+            case 5:
+                playerAttackCooldown5 = presets.cooldown;
+                playerSkillCount5 = presets.count;
+                playerDuration5 = presets.duration;
+                playerSkillRadius5 = presets.radius;
+                playerInitialDamage5 = presets.initialDamage;
+                playerDotDamage5 = presets.dotDamage;
+                playerDotInterval5 = presets.tickInterval;
+                controlValues.cooldown5Display.textContent = presets.cooldown;
+                controlValues.count5Display.textContent = presets.count;
+                controlValues.duration5Display.textContent = presets.duration;
+                controlValues.radius5Display.textContent = presets.radius;
+                controlValues.initialDamage5Display.textContent = presets.initialDamage;
+                controlValues.dotDamage5Display.textContent = presets.dotDamage;
+                controlValues.dotInterval5Display.textContent = presets.tickInterval;
+                break;
+            case 6:
+                playerAttackCooldown6 = presets.cooldown;
+                playerDuration6 = presets.duration;
+                playerSphereCount6 = presets.count;
+                playerSphereRadius6 = presets.radius;
+                playerSpeed6 = presets.speed;
+                playerDamage6 = presets.damage;
+                playerSubFireInterval6 = presets.subFireInterval;
+                playerSubDamage6 = presets.subDamage;
+                playerSubSpeed6 = presets.subSpeed;
+                playerSubDuration6 = presets.subDuration;
+                playerSubRadius6 = presets.subRadius;
+                controlValues.cooldown6Display.textContent = presets.cooldown;
+                controlValues.duration6Display.textContent = presets.duration;
+                controlValues.count6Display.textContent = presets.count;
+                controlValues.radius6Display.textContent = presets.radius;
+                controlValues.speed6Display.textContent = presets.speed;
+                controlValues.damage6Display.textContent = presets.damage;
+                controlValues.subFireInterval6Display.textContent = presets.subFireInterval;
+                controlValues.subDamage6Display.textContent = presets.subDamage;
+                controlValues.subSpeed6Display.textContent = presets.subSpeed;
+                controlValues.subDuration6Display.textContent = presets.subDuration;
+                controlValues.subRadius6Display.textContent = presets.subRadius;
+                break;
+        }
+    }
+
+    function upgradeAllSkills(level) {
+        for (let i = 1; i <= 6; i++) {
+            if (controls[`skill${i}Enabled`].checked) {
+                controls[`level${i}`].value = level;
+                updateSkillFromLevel(i);
+            }
+        }
+        controls.masterLevel.value = level;
+        controlValues.masterLevelValue.textContent = level;
+    }
+
+    /**
+     * 執行一次性的遊戲設定
+     */
+    function setupGame() {
+        ['enemyHealth', 'enemyDamage', 'spawnRate', 'spawnRateReduction', 'spawnReductionInterval', 'spawnCount', 'spawnAccelerationCount', 'growthRate', 'moveSpeed', 'maxEnemies'].forEach(key => {
+            controls[key].addEventListener('input', () => {
+                const value = parseFloat(controls[key].value);
+                controlValues[`${key}Value`].textContent = value;
+                switch(key) {
+                    case 'enemyHealth': enemyBaseHealth = value; break;
+                    case 'enemyDamage': enemyCollisionDamage = value; break;
+                    case 'spawnRate': initialSpawnInterval = value; break;
+                    case 'spawnRateReduction': enemySpawnRateReduction = value; break;
+                    case 'spawnReductionInterval': enemySpawnReductionInterval = value * 1000; break;
+                    case 'spawnCount': enemySpawnCount = value; break;
+                    case 'spawnAccelerationCount': enemySpawnAccelerationCount = value; break;
+                    case 'growthRate': enemyHealthGrowthFactor = value; break;
+                    case 'moveSpeed': enemyMoveSpeed = value * 60; break;
+                    case 'maxEnemies': maxEnemiesAllowed = value; break;
+                }
+            });
+            const initialValue = parseFloat(controls[key].value);
+            controlValues[`${key}Value`].textContent = initialValue;
+            switch(key) {
+                case 'enemyHealth': enemyBaseHealth = initialValue; break;
+                case 'enemyDamage': enemyCollisionDamage = initialValue; break;
+                case 'spawnRate': initialSpawnInterval = initialValue; break;
+                case 'spawnRateReduction': enemySpawnRateReduction = initialValue; break;
+                case 'spawnReductionInterval': enemySpawnReductionInterval = initialValue * 1000; break;
+                case 'spawnCount': enemySpawnCount = initialValue; break;
+                case 'spawnAccelerationCount': enemySpawnAccelerationCount = initialValue; break;
+                case 'growthRate': enemyHealthGrowthFactor = initialValue; break;
+                case 'moveSpeed': enemyMoveSpeed = initialValue * 60; break;
+                case 'maxEnemies': maxEnemiesAllowed = initialValue; break;
+            }
+        });
+
+        for (let i = 1; i <= 6; i++) {
+            controls[`skill${i}Enabled`].addEventListener('input', () => {
+                const value = controls[`skill${i}Enabled`].checked;
+                switch(i) {
+                    case 1: isSkill1Enabled = value; break;
+                    case 2: isSkill2Enabled = value; break;
+                    case 3: isSkill3Enabled = value; break;
+                    case 4: isSkill4Enabled = value; break;
+                    case 5: isSkill5Enabled = value; break;
+                    case 6: isSkill6Enabled = value; break;
+                }
+            });
+            
+            controls[`level${i}`].addEventListener('input', () => updateSkillFromLevel(i));
+
+            const initialEnableValue = controls[`skill${i}Enabled`].checked;
+            switch(i) {
+                case 1: isSkill1Enabled = initialEnableValue; break;
+                case 2: isSkill2Enabled = initialEnableValue; break;
+                case 3: isSkill3Enabled = initialEnableValue; break;
+                case 4: isSkill4Enabled = initialEnableValue; break;
+                case 5: isSkill5Enabled = initialEnableValue; break;
+                case 6: isSkill6Enabled = initialEnableValue; break;
+            }
+            updateSkillFromLevel(i);
+        }
+        
+        controls.masterLevel.addEventListener('input', () => {
+            const level = controls.masterLevel.value;
+            controlValues.masterLevelValue.textContent = level;
+            for (let i = 1; i <= 6; i++) {
+                controls[`level${i}`].value = level;
+                updateSkillFromLevel(i);
+            }
+        });
+
+        controls.autoUpgradeEnabled.addEventListener('input', () => {
+            isAutoUpgradeEnabled = controls.autoUpgradeEnabled.checked;
+        });
+        isAutoUpgradeEnabled = controls.autoUpgradeEnabled.checked;
+
+        window.addEventListener('resize', resizeCanvas);
+        restartButton.addEventListener('click', resetGame);
+
+        copyLogButton.addEventListener('click', () => {
+            let data = '技能效益分析\n';
+            data += '技能\t發動次數\t命中次數\t總傷害\t總溢傷\t命中率 (%)\t單次命中傷害\t單次命中溢傷\n';
+
+            const skills = ['苦無', '力場', '守衛', '火箭', '雷電', '榴槤'];
+            const activations = [activations1, activations2, activations3, activations4, activations5, activations6];
+            const hits = [hits1, hits2, hits3, hits4, hits5, hits6];
+            const damages = [totalDamageDealt1, totalDamageDealt2, totalDamageDealt3, totalDamageDealt4, totalDamageDealt5, totalDamageDealt6];
+            const overkills = [totalOverkillDamage1, totalOverkillDamage2, totalOverkillDamage3, totalOverkillDamage4, totalOverkillDamage5, totalOverkillDamage6];
+
+            for (let i = 0; i < skills.length; i++) {
+                if (activations[i] > 0) {
+                    const hitRate = hits[i] > 0 ? ((hits[i] / (activations[i] * (i === 0 ? playerProjectileCount1 : 1))) * 100).toFixed(1) : 0;
+                    const damagePerHit = hits[i] > 0 ? (damages[i] / hits[i]).toFixed(0) : 0;
+                    const overkillPerHit = hits[i] > 0 ? (overkills[i] / hits[i]).toFixed(1) : 0;
+                    data += `${skills[i]}\t${activations[i]}\t${hits[i]}\t${damages[i]}\t${overkills[i]}\t${hitRate}\t${damagePerHit}\t${overkillPerHit}\n`;
+                }
+            }
+
+            data += '\n\n傷害日誌 (每秒累計)\n';
+            data += '時間(秒)\t苦無傷\t苦無溢\t力場傷\t力場溢\t守衛傷\t守衛溢\t火箭傷\t火箭溢\t雷電傷\t雷電溢\t榴槤傷\t榴槤溢\n';
+
+            damageLog.forEach(log => {
+                data += `${log.time}\t${log.d1}\t${log.o1}\t${log.d2}\t${log.o2}\t${log.d3}\t${log.o3}\t${log.d4}\t${log.o4}\t${log.d5}\t${log.o5}\t${log.d6}\t${log.o6}\n`;
+            });
+
+
+            const textarea = document.createElement('textarea');
+            textarea.value = data;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            const originalText = copyLogButton.innerText;
+            copyLogButton.innerText = '已複製！';
+            setTimeout(() => {
+                copyLogButton.innerText = originalText;
+            }, 2000);
+        });
+
+        toggleStatsButton.addEventListener('click', () => {
+            const statsWrapper = document.getElementById('stats-details-wrapper');
+            statsWrapper.classList.toggle('hidden');
+            if (statsWrapper.classList.contains('hidden')) {
+                toggleStatsButton.innerText = '顯示詳細資訊';
+            } else {
+                toggleStatsButton.innerText = '隱藏詳細資訊';
+            }
+        });
+        
+        resetGame();
+    }
+
+    // --- 遊戲啟動 ---
+    window.onload = setupGame;
+
+</script>
+
+</body>
+</html>
